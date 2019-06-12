@@ -24,7 +24,7 @@ const (
 	BeforeTestAnnotation = "@beforeTest"
 
 	// AfterTestAnnotation used to label a function as a after test hook
-	AfterTestAnnotation = "@afterest"
+	AfterTestAnnotation = "@afterTest"
 )
 
 var (
