@@ -64,6 +64,10 @@ func main() {
 		die(err)
 	}
 
+	if res == nil {
+		return
+	}
+
 	bytes := generateFile(res, *funcname, *prefix)
 
 	if bytes, err = format.Source(bytes); err != nil {
