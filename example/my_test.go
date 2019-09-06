@@ -9,7 +9,7 @@ import (
 	"github.com/jstroem/tedi"
 )
 
-//go:generate tedi
+//go:generate tedi generate
 
 // bar
 type a struct {

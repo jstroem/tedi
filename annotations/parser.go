@@ -17,6 +17,8 @@ const (
 	// OnceFixtureAnnotation used to label a function as a fixture to be called once
 	OnceFixtureAnnotation = "@onceFixture"
 
+	DoAnnotation = "@doOnce"
+
 	// TestAnnotation used to label a function as a test
 	TestAnnotation = "@test"
 
