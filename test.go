@@ -29,11 +29,14 @@ type testFunc func(t *testing.T)
 
 func (t *Tedi) wrapTest(name string, fn interface{}) testFunc {
 	return func(test *testing.T) {
-		c, t, err := t.createContainer(test)
+		c, t, err := t.createContainer(test, name)
 		require.NoError(test, err, "Failed to build container for test: %s", name)
 		require.NoError(test, t.onStart(), "Failed to run onStart for test: %s", name)
-		require.NoError(test, c.Invoke(fn), "Failed to Invoke test: %s", name)
-		require.NoError(test, t.onEnd(), "Failed to run onEnd for test: %s", name)
+		t.running = true
+		defer func() {
+			require.NoError(test, t.onEnd(), "Failed to run onEnd for test: %s", name)
+		}()
+		require.NoError(t, c.Invoke(fn), "Failed to Invoke test: %s", name)
 	}
 }
 
@@ -53,11 +56,13 @@ func (t *Tedi) addTest(name string, fn testFunc) {
 	tests.Elem().Set(res)
 }
 
-func (t *Tedi) createT(test *testing.T, container *dig.Container) *T {
+func (t *Tedi) createT(test *testing.T, container *dig.Container, testName string) *T {
 	res := &T{
 		T:           test,
 		tedi:        t,
 		container:   container,
+		running:     false,
+		testName:    testName,
 		beforeTests: make([]interface{}, len(t.beforeTests)),
 		afterTests:  make([]interface{}, len(t.afterTests)),
 	}
@@ -73,6 +78,8 @@ type T struct {
 	*testing.T
 	tedi      *Tedi
 	container *dig.Container
+	running   bool
+	testName  string
 
 	beforeTests []interface{}
 	afterTests  []interface{}
@@ -98,6 +105,10 @@ func (t *T) onEnd() error {
 
 // BeforeTest register a function to be called before a test will run.
 func (t *T) BeforeTest(fn interface{}) {
+	if t.running {
+		require.NoError(t, t.container.Invoke(fn), "Failed to run BeforeTest for test: %s", t.testName)
+		return
+	}
 	t.beforeTests = append(t.beforeTests, fn)
 }
 

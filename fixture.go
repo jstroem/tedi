@@ -56,7 +56,7 @@ func (t *Tedi) OnceFixture(fn interface{}) error {
 
 type onEndFunc func() error
 
-func (t *Tedi) createContainer(test *testing.T) (*dig.Container, *T, error) {
+func (t *Tedi) createContainer(test *testing.T, testName string) (*dig.Container, *T, error) {
 	res := dig.New()
 	for _, fn := range t.fixtures {
 		if err := res.Provide(fn); err != nil {
@@ -68,7 +68,7 @@ func (t *Tedi) createContainer(test *testing.T) (*dig.Container, *T, error) {
 		return nil, nil, err
 	}
 
-	tediTest := t.createT(test, res)
+	tediTest := t.createT(test, res, testName)
 	if err := res.Provide(func() *T { return tediTest }); err != nil {
 		return nil, nil, err
 	}
