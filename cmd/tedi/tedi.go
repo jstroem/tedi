@@ -8,13 +8,13 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
 
 	"github.com/jstroem/tedi/annotations"
+	"golang.org/x/tools/go/packages"
 )
 
 const (
@@ -133,52 +133,73 @@ func generateCommand() {
 		die(err)
 	}
 
+	if err = writeTediFile(dir, writeTediFileOptions{
+		Funcname: *generateFuncname,
+		Prefix:   *generatePrefix,
+		BuildTag: *generateBuildTag,
+	}); err != nil {
+		die(err)
+	}
+}
+
+type writeTediFileOptions struct {
+	Funcname string
+	Prefix   string
+	BuildTag string
+}
+
+func writeTediFile(dir string, o writeTediFileOptions) error {
 	res, err := annotations.Parse(dir, "_test.go")
 	if err != nil {
-		die(err)
+		return err
 	}
 
 	if res == nil {
-		return
+		return nil
 	}
 
-	bytes := generateFile(res, *generateFuncname, *generatePrefix)
-
+	bytes := generateFile(res, o.Funcname, o.Prefix, o.BuildTag)
 	if bytes, err = format.Source(bytes); err != nil {
-		die(err)
+		return err
 	}
 
 	outputFile := filepath.Join(dir, *generateOutput)
-	err = ioutil.WriteFile(outputFile, bytes, 0644)
-	if err != nil {
-		log.Fatalf("writing output: %s", err)
-	}
+	return ioutil.WriteFile(outputFile, bytes, 0644)
 }
 
 func testCommand() {
-	cmd := exec.Command("go", append([]string{"generate"}, testCmd.Args()...)...)
-	cmd.Stderr = os.Stderr
-	cmd.Stdout = os.Stdout
-
-	cmd.Run()
-	if exitCode := cmd.ProcessState.ExitCode(); exitCode != 0 {
-		os.Exit(exitCode)
+	pkgs, err := packages.Load(&packages.Config{
+		Mode: packages.NeedName & packages.NeedFiles,
+	}, testCmd.Args()...)
+	if err != nil {
+		die(err)
 	}
-
-	cmd = exec.Command("go", os.Args[1:]...)
-	cmd.Stderr = os.Stderr
-	cmd.Stdout = os.Stdout
-
-	cmd.Run()
-	if exitCode := cmd.ProcessState.ExitCode(); exitCode != 0 {
-		os.Exit(exitCode)
+	for _, pkg := range pkgs {
+		fmt.Println(pkg.ID, pkg.PkgPath, pkg.Name, pkg.Types)
 	}
+	// cmd := exec.Command("go", append([]string{"generate"}, testCmd.Args()...)...)
+	// cmd.Stderr = os.Stderr
+	// cmd.Stdout = os.Stdout
+
+	// cmd.Run()
+	// if exitCode := cmd.ProcessState.ExitCode(); exitCode != 0 {
+	// 	os.Exit(exitCode)
+	// }
+
+	// cmd = exec.Command("go", os.Args[1:]...)
+	// cmd.Stderr = os.Stderr
+	// cmd.Stdout = os.Stdout
+
+	// cmd.Run()
+	// if exitCode := cmd.ProcessState.ExitCode(); exitCode != 0 {
+	// 	os.Exit(exitCode)
+	// }
 }
 
-func generateFile(parsed *annotations.ParseResult, funcName, prefixTestName string) []byte {
+func generateFile(parsed *annotations.ParseResult, funcName, prefixTestName, buildTags string) []byte {
 	g := &generator{}
 
-	if tags := *generateBuildTag; len(tags) > 0 {
+	if tags := buildTags; len(tags) > 0 {
 		g.Printf("// +build %s\n", tags)
 		g.Printf("\n")
 	}
