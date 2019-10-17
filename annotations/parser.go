@@ -27,55 +27,193 @@ const (
 
 	// AfterTestAnnotation used to label a function as a after test hook
 	AfterTestAnnotation = "@afterTest"
+
+	// TestLabelAnnotation used to introduce a new test Label.
+	TestLabelAnnotation = "@testLabel"
+
+	// DefaultTestLabelAnnotation used to set the default test label.
+	DefaultTestLabelAnnotation = "@defaultTestLabel"
+
+	defaultTestLabel = "test"
 )
 
 var (
-	fixtureRegexp     = annotationRegexp(FixtureAnnotation)
-	onceFixtureRegexp = annotationRegexp(OnceFixtureAnnotation)
-	testRegexp        = annotationRegexp(TestAnnotation)
-	beforeTestRegexp  = annotationRegexp(BeforeTestAnnotation)
-	afterTestRegexp   = annotationRegexp(AfterTestAnnotation)
+	fixtureRegexp          = annotationRegexp(FixtureAnnotation)
+	onceFixtureRegexp      = annotationRegexp(OnceFixtureAnnotation)
+	testRegexp             = annotationWithOptionalParamsRegexp(TestAnnotation)
+	beforeTestRegexp       = annotationWithOptionalParamsRegexp(BeforeTestAnnotation)
+	afterTestRegexp        = annotationWithOptionalParamsRegexp(AfterTestAnnotation)
+	testLabelRegexp        = annotationWithParamsRegexp(TestLabelAnnotation)
+	defaultTestLabelRegexp = annotationWithParamsRegexp(DefaultTestLabelAnnotation)
 )
 
 func annotationRegexp(annotation string) *regexp.Regexp {
-	return regexp.MustCompile(fmt.Sprint(`(^|\n)\s*`, annotation, `\s+`))
+	return regexp.MustCompile(fmt.Sprint(`(^|\n)\s*`, annotation, `\s*($|\n)`))
+}
+
+func annotationWithParamsRegexp(annotation string) *regexp.Regexp {
+	return regexp.MustCompile(fmt.Sprint(`(?:^|\n)\s*`, annotation, `\((\w+(?:,\s*\w+)*)\)\s*(?:$|\n)`))
+}
+
+func annotationWithOptionalParamsRegexp(annotation string) *regexp.Regexp {
+	return regexp.MustCompile(fmt.Sprint(`(?:^|\n)\s*`, annotation, `(?:\((\w+(?:,\s*\w+)*)\))?\s*(?:$|\n)`))
+}
+
+func getParams(annotation *regexp.Regexp, cmt string) ([]string, bool) {
+	res := annotation.FindStringSubmatch(cmt)
+	if len(res) != 2 {
+		return nil, false
+	}
+	if len(res[1]) > 0 {
+		res = strings.Split(res[1], ",")
+		for i := range res {
+			res[i] = strings.TrimSpace(strings.TrimLeft(res[i], ","))
+		}
+	} else {
+		res = nil
+	}
+	return res, true
 }
 
 // ParseResult holds the package and functions parsed.
 type ParseResult struct {
-	Package      *ast.Package
+	Package *ast.Package
+
+	DefaultTestLabel string
+	// Label name => prefix.
+	TestLabels   map[string][]string
 	Fixtures     []*Function
 	OnceFixtures []*Function
-	Tests        []*Function
-	BeforeTests  []*Function
-	AfterTests   []*Function
+	Tests        []*LabelFunction
+	BeforeTests  []*LabelFunction
+	AfterTests   []*LabelFunction
+
+	Warnings []string
+}
+
+type LabelFunction struct {
+	*Function
+	Labels []string
 }
 
 // Parse returns the parsed result of the package.
-func Parse(pkgDir string, filePrefix string) (*ParseResult, error) {
-	fns, err := parseFunctions(pkgDir, filePrefix)
+func Parse(pkgDir string, filePrefix string, autoLabel bool) (*ParseResult, error) {
+	parseResult, err := parsePackage(pkgDir, filePrefix)
 	if err != nil {
 		return nil, err
 	}
 
-	res := &ParseResult{}
+	res := &ParseResult{
+		DefaultTestLabel: defaultTestLabel,
+		TestLabels:       map[string][]string{},
+	}
 
-	for _, fn := range fns {
+	for _, cmt := range parseResult.comments {
+		if testLabelRegexp.MatchString(cmt) {
+			params, ok := getParams(testLabelRegexp, cmt)
+			if !ok {
+				res.Warnings = append(res.Warnings, fmt.Sprintf("@testLabel parameters could not be parsed '%s'", cmt))
+				continue
+			}
+
+			if len(params) < 1 {
+				res.Warnings = append(res.Warnings, fmt.Sprintf("@testLabel must have one argument '%s'", cmt))
+				continue
+			}
+
+			Label := params[0]
+			res.TestLabels[Label] = append(res.TestLabels[Label], params[1:]...)
+		}
+
+		if defaultTestLabelRegexp.MatchString(cmt) {
+			params, ok := getParams(defaultTestLabelRegexp, cmt)
+			if !ok {
+				res.Warnings = append(res.Warnings, fmt.Sprintf("@defaultTestLabel parameters could not be parsed '%s'", cmt))
+				continue
+			}
+
+			if len(params) > 1 {
+				res.Warnings = append(res.Warnings, fmt.Sprintf("@defaultTestLabel can only have one argument '%s'", cmt))
+				continue
+			}
+
+			res.DefaultTestLabel = params[0]
+		}
+	}
+
+	// Ensure that the default test label exists.
+	if _, ok := res.TestLabels[res.DefaultTestLabel]; !ok {
+		res.TestLabels[res.DefaultTestLabel] = nil
+	}
+
+	parseLabels := func(regex *regexp.Regexp, fn *Function, defaultLabels []string) ([]string, bool) {
+		labels, ok := getParams(regex, fn.Comment())
+		if !ok {
+			return nil, ok
+		}
+		if len(labels) == 0 {
+			labels = defaultLabels
+		} else {
+			for _, label := range labels {
+				if _, ok := res.TestLabels[label]; !ok {
+					res.TestLabels[label] = nil
+				}
+			}
+		}
+
+		return labels, ok
+	}
+
+	for _, fn := range parseResult.functions {
 		if res.Package == nil {
 			res.Package = fn.Package
 		}
 
+		// Check function annotations
 		switch {
 		case fn.HasTestAnnotation():
-			res.Tests = append(res.Tests, fn)
+			labels, ok := parseLabels(testRegexp, fn, []string{res.DefaultTestLabel})
+			if ok {
+				res.Tests = append(res.Tests, &LabelFunction{Function: fn, Labels: labels})
+			} else {
+				res.Warnings = append(res.Warnings, fmt.Sprintf("@test parameters could not be parsed '%s'", fn.Comment()))
+			}
+			continue
 		case fn.HasFixtureAnnotation():
 			res.Fixtures = append(res.Fixtures, fn)
+			continue
 		case fn.HasOnceFixtureAnnotation():
 			res.OnceFixtures = append(res.OnceFixtures, fn)
+			continue
 		case fn.HasBeforeTestAnnotation():
-			res.BeforeTests = append(res.BeforeTests, fn)
+			labels, ok := parseLabels(beforeTestRegexp, fn, []string{res.DefaultTestLabel})
+			if ok {
+				res.BeforeTests = append(res.BeforeTests, &LabelFunction{Function: fn, Labels: labels})
+			} else {
+				res.Warnings = append(res.Warnings, fmt.Sprintf("@beforeTest parameters could not be parsed '%s'", fn.Comment()))
+			}
+			continue
 		case fn.HasAfterTestAnnotation():
-			res.AfterTests = append(res.AfterTests, fn)
+			labels, ok := parseLabels(afterTestRegexp, fn, []string{res.DefaultTestLabel})
+			if ok {
+				res.AfterTests = append(res.AfterTests, &LabelFunction{Function: fn, Labels: labels})
+			} else {
+				res.Warnings = append(res.Warnings, fmt.Sprintf("@afterTest parameters could not be parsed '%s'", fn.Comment()))
+			}
+			continue
+		}
+
+		// Check auto grouping
+		var labels []string
+		for label, prefixes := range res.TestLabels {
+			for _, prefix := range prefixes {
+				if strings.HasPrefix(fn.Name(), prefix) {
+					labels = append(labels, label)
+				}
+			}
+		}
+		if len(labels) > 0 {
+			res.Tests = append(res.Tests, &LabelFunction{Function: fn, Labels: labels})
 		}
 	}
 
@@ -119,10 +257,23 @@ func (f *Function) HasAfterTestAnnotation() bool {
 }
 
 func (f *Function) commentMatches(regex *regexp.Regexp) bool {
-	return regex.MatchString(f.Decl.Doc.Text())
+	return regex.MatchString(f.Comment())
 }
 
-func parseFunctions(pkg string, filePrefix string) ([]*Function, error) {
+func (f *Function) Name() string {
+	return f.Decl.Name.String()
+}
+
+func (f *Function) Comment() string {
+	return f.Decl.Doc.Text()
+}
+
+type parseResult struct {
+	functions []*Function
+	comments  []string
+}
+
+func parsePackage(pkg string, filePrefix string) (*parseResult, error) {
 	fset := token.NewFileSet()
 
 	pkgs, err := parser.ParseDir(fset, pkg, func(fi os.FileInfo) bool {
@@ -133,7 +284,7 @@ func parseFunctions(pkg string, filePrefix string) ([]*Function, error) {
 		return nil, err
 	}
 
-	var fns []*Function
+	res := &parseResult{}
 
 	for pkgName := range pkgs {
 		pkg := pkgs[pkgName]
@@ -142,11 +293,14 @@ func parseFunctions(pkg string, filePrefix string) ([]*Function, error) {
 			for _, decl := range file.Decls {
 				switch decl := decl.(type) {
 				case *ast.FuncDecl:
-					fns = append(fns, &Function{Package: pkg, File: fileName, Decl: decl})
+					res.functions = append(res.functions, &Function{Package: pkg, File: fileName, Decl: decl})
 				}
+			}
+			for _, cmt := range file.Comments {
+				res.comments = append(res.comments, cmt.Text())
 			}
 		}
 	}
 
-	return fns, nil
+	return res, nil
 }
