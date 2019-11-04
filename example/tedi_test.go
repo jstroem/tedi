@@ -3,10 +3,9 @@
 package test
 
 import (
+	"github.com/jstroem/tedi"
 	"os"
 	"testing"
-
-	"github.com/jstroem/tedi"
 )
 
 func TestMain(m *testing.M) {

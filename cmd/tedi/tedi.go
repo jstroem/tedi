@@ -84,6 +84,8 @@ var (
 	testRace                 = testCmd.Bool("race", false, "enable the race detector when running tests")
 	testV                    = testCmd.Bool("v", false, "verbose: print additional output")
 
+	tediTestLabels = testCmd.String("labels", "test", "Tedi test labels to run. Can be multiple with ',' as a seperator")
+
 	testTags = testCmd.String("tags", "", "tags")
 )
 
@@ -221,6 +223,20 @@ func testCommand() {
 		}
 	}
 
+	idx := 0
+	for i, arg := range os.Args {
+		if arg == "-labels" {
+			idx = i
+			break
+		}
+	}
+
+	// '-labels' flag is a custom 'tedi' flag so we need to move them as the last arguments to go test.
+	if idx > 0 && idx+1 < len(os.Args) {
+		labelFlag, labelValue := os.Args[idx], os.Args[idx+1]
+		os.Args = append(append(os.Args[0:idx], os.Args[idx+2:]...), labelFlag, labelValue)
+	}
+
 	cmd := exec.Command("go", os.Args[1:]...)
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
@@ -254,7 +270,6 @@ func generateFile(parsed *annotations.ParseResult, funcName, prefixTestName, bui
 
 	var buf bytes.Buffer
 	if len(parsed.TestLabels) > 0 {
-		write = true
 		fmt.Fprintln(&buf, "// TestLabels: ")
 		for label := range parsed.TestLabels {
 			fmt.Fprintf(&buf, testLabelCall, label)
