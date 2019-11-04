@@ -12,7 +12,6 @@ import (
 //go:generate tedi generate
 
 // @testLabel(integration, integration_)
-// @defaultTestLabel(integration, integration_)
 
 type a struct {
 	b string
