@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/jstroem/tedi/annotations"
@@ -30,9 +31,10 @@ const (
 	}`
 	fixtureCall     = `t.Fixture(%s)` + "\n"
 	onceFixtureCall = `t.OnceFixture(%s)` + "\n"
-	testCall        = `t.Test("%s", %s)` + "\n"
-	beforeTestCall  = `t.BeforeTest(%s)` + "\n"
-	afterTestCall   = `t.AfterTest(%s)` + "\n"
+	testCall        = `t.Test("%s", %s%s)` + "\n"
+	beforeTestCall  = `t.BeforeTest(%s%s)` + "\n"
+	afterTestCall   = `t.AfterTest(%s%s)` + "\n"
+	testLabelCall   = `t.TestLabel("%s")` + "\n"
 )
 
 func init() {
@@ -153,7 +155,7 @@ type writeTediFileOptions struct {
 }
 
 func writeTediFile(dir string, o writeTediFileOptions) error {
-	res, err := annotations.Parse(dir, "_test.go")
+	res, err := annotations.Parse(dir, "_test.go", true)
 	if err != nil {
 		return err
 	}
@@ -165,6 +167,10 @@ func writeTediFile(dir string, o writeTediFileOptions) error {
 	bytes, write := generateFile(res, o.Funcname, o.Prefix, o.BuildTag)
 	if !write {
 		return nil
+	}
+
+	for _, warning := range res.Warnings {
+		log.Println(warning)
 	}
 
 	if bytes, err = format.Source(bytes); err != nil {
@@ -247,8 +253,17 @@ func generateFile(parsed *annotations.ParseResult, funcName, prefixTestName, bui
 	write := false
 
 	var buf bytes.Buffer
+	if len(parsed.TestLabels) > 0 {
+		write = true
+		fmt.Fprintln(&buf, "// TestLabels: ")
+		for label := range parsed.TestLabels {
+			fmt.Fprintf(&buf, testLabelCall, label)
+		}
+	}
+
 	if len(parsed.Fixtures) > 0 {
 		write = true
+		fmt.Fprintln(&buf, "")
 		fmt.Fprintln(&buf, "// Fixtures: ")
 		for _, fixture := range parsed.Fixtures {
 			fmt.Fprintf(&buf, fixtureCall, fixture.Decl.Name.Name)
@@ -269,7 +284,11 @@ func generateFile(parsed *annotations.ParseResult, funcName, prefixTestName, bui
 		fmt.Fprintln(&buf, "")
 		fmt.Fprintln(&buf, "// Before tests: ")
 		for _, test := range parsed.BeforeTests {
-			fmt.Fprintf(&buf, beforeTestCall, test.Decl.Name.Name)
+			labelArgs := ""
+			if len(test.Labels) > 0 {
+				labelArgs = fmt.Sprint(`, "`, strings.Join(test.Labels, `", "`), `"`)
+			}
+			fmt.Fprintf(&buf, beforeTestCall, test.Decl.Name.Name, labelArgs)
 		}
 	}
 
@@ -278,7 +297,11 @@ func generateFile(parsed *annotations.ParseResult, funcName, prefixTestName, bui
 		fmt.Fprintln(&buf, "")
 		fmt.Fprintln(&buf, "// Tests: ")
 		for _, test := range parsed.Tests {
-			fmt.Fprintf(&buf, testCall, prefixTestName+test.Decl.Name.Name, test.Decl.Name.Name)
+			labelArgs := ""
+			if len(test.Labels) > 0 {
+				labelArgs = fmt.Sprint(`, "`, strings.Join(test.Labels, `", "`), `"`)
+			}
+			fmt.Fprintf(&buf, testCall, prefixTestName+test.Decl.Name.Name, test.Decl.Name.Name, labelArgs)
 		}
 	}
 
@@ -287,7 +310,11 @@ func generateFile(parsed *annotations.ParseResult, funcName, prefixTestName, bui
 		fmt.Fprintln(&buf, "")
 		fmt.Fprintln(&buf, "// After tests: ")
 		for _, test := range parsed.AfterTests {
-			fmt.Fprintf(&buf, afterTestCall, test.Decl.Name.Name)
+			labelArgs := ""
+			if len(test.Labels) > 0 {
+				labelArgs = fmt.Sprint(`, "`, strings.Join(test.Labels, `", "`), `"`)
+			}
+			fmt.Fprintf(&buf, afterTestCall, test.Decl.Name.Name, labelArgs)
 		}
 	}
 

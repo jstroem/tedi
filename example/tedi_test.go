@@ -12,6 +12,10 @@ import (
 func TestMain(m *testing.M) {
 	t := tedi.New(m)
 
+	// TestLabels:
+	t.TestLabel("integration")
+	t.TestLabel("test")
+
 	// Fixtures:
 	t.Fixture(myFixture)
 	t.Fixture(myTimer)
@@ -20,12 +24,14 @@ func TestMain(m *testing.M) {
 	t.OnceFixture(randFixture)
 
 	// Before tests:
-	t.BeforeTest(myBefore)
+	t.BeforeTest(myBefore, "test")
 
 	// Tests:
-	t.Test("MyTest2", MyTest2)
-	t.Test("MyTest3", MyTest3)
-	t.Test("MyTestTiming", MyTestTiming)
+	t.Test("MyTest2", MyTest2, "test")
+	t.Test("MyTest3", MyTest3, "test")
+	t.Test("MyIntegrationTest", MyIntegrationTest, "integration")
+	t.Test("integration_Test", integration_Test, "integration")
+	t.Test("MyTestTiming", MyTestTiming, "test")
 
 	os.Exit(t.Run())
 }

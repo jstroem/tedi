@@ -11,12 +11,13 @@ import (
 
 //go:generate tedi generate
 
-// bar
+// @testLabel(integration, integration_)
+
 type a struct {
 	b string
 }
 
-// @fixture sdsd
+// @fixture
 func myFixture(t *testing.T, r int64) int {
 	fmt.Println("Fixture rand", r)
 	return len(t.Name())
@@ -52,6 +53,15 @@ func MyTest3(t *tedi.T, foo int) {
 			fmt.Println(t.Name(), foo)
 		})
 	})
+}
+
+// @test(integration)
+func MyIntegrationTest(t *tedi.T, foo int) {
+	fmt.Println("MyIntegrationTest test executed")
+}
+
+func integration_Test(t *tedi.T) {
+	fmt.Println("integration_Test test executed")
 }
 
 type printTimerFunc func()
