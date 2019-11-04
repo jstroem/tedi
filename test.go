@@ -10,26 +10,37 @@ import (
 )
 
 // Test registers a function as a test.
-func (t *Tedi) Test(name string, fn interface{}) {
-	testFn := t.wrapTest(name, fn)
-	t.addTest(name, testFn)
+func (t *Tedi) Test(name string, fn interface{}, labels ...string) {
+	testsLabel := newStringSet(labels...)
+
+	matchedLabels := testsLabel.Intersect(t.labels)
+	matchedLabels = matchedLabels.Intersect(t.runLabels)
+	if len(matchedLabels) > 0 {
+		// Ignore test if the groupset does not overlap with the running set.
+		testFn := t.wrapTest(name, fn, labels...)
+		t.addTest(name, testFn)
+	}
 }
 
 // BeforeTest registers a function as a beforeTest hook.
-func (t *Tedi) BeforeTest(fn interface{}) {
-	t.beforeTests = append(t.beforeTests, fn)
+func (t *Tedi) BeforeTest(fn interface{}, labels ...string) {
+	for _, label := range labels {
+		t.beforeTests[label] = append(t.beforeTests[label], fn)
+	}
 }
 
 // AfterTest registers a function as a afterTest hook.
-func (t *Tedi) AfterTest(fn interface{}) {
-	t.afterTests = append(t.afterTests, fn)
+func (t *Tedi) AfterTest(fn interface{}, labels ...string) {
+	for _, label := range labels {
+		t.afterTests[label] = append(t.afterTests[label], fn)
+	}
 }
 
 type testFunc func(t *testing.T)
 
-func (t *Tedi) wrapTest(name string, fn interface{}) testFunc {
+func (t *Tedi) wrapTest(name string, fn interface{}, labels ...string) testFunc {
 	return func(test *testing.T) {
-		c, t, err := t.createContainer(test, name)
+		c, t, err := t.createContainer(test, name, labels...)
 		require.NoError(test, err, "Failed to build container for test: %s", name)
 		require.NoError(test, t.onStart(), "Failed to run onStart for test: %s", name)
 		t.running = true
@@ -56,18 +67,19 @@ func (t *Tedi) addTest(name string, fn testFunc) {
 	tests.Elem().Set(res)
 }
 
-func (t *Tedi) createT(test *testing.T, container *dig.Container, testName string) *T {
+func (t *Tedi) createT(test *testing.T, container *dig.Container, testName string, testLabels ...string) *T {
 	res := &T{
-		T:           test,
-		tedi:        t,
-		container:   container,
-		running:     false,
-		testName:    testName,
-		beforeTests: make([]interface{}, len(t.beforeTests)),
-		afterTests:  make([]interface{}, len(t.afterTests)),
+		T:          test,
+		tedi:       t,
+		container:  container,
+		running:    false,
+		testName:   testName,
+		testLabels: testLabels,
 	}
-	copy(res.beforeTests, t.beforeTests)
-	copy(res.afterTests, t.afterTests)
+	for _, label := range testLabels {
+		res.beforeTests = append(res.beforeTests, t.beforeTests[label]...)
+		res.afterTests = append(res.afterTests, t.afterTests[label]...)
+	}
 	return res
 }
 
@@ -76,10 +88,11 @@ func (t *Tedi) createT(test *testing.T, container *dig.Container, testName strin
 // works with dependency injection.
 type T struct {
 	*testing.T
-	tedi      *Tedi
-	container *dig.Container
-	running   bool
-	testName  string
+	tedi       *Tedi
+	container  *dig.Container
+	running    bool
+	testName   string
+	testLabels []string
 
 	beforeTests []interface{}
 	afterTests  []interface{}
@@ -119,5 +132,5 @@ func (t *T) AfterTest(fn interface{}) {
 
 // Run fn as a subtest of t similar to how testing.T.Run would work.
 func (t *T) Run(name string, fn interface{}) bool {
-	return t.T.Run(name, t.tedi.wrapTest(name, fn))
+	return t.T.Run(name, t.tedi.wrapTest(name, fn, t.testLabels...))
 }
