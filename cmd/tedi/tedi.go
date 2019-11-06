@@ -154,6 +154,7 @@ type writeTediFileOptions struct {
 	Prefix     string
 	BuildTag   string
 	OutputFile string
+	ForceWrite bool
 }
 
 func writeTediFile(dir string, o writeTediFileOptions) error {
@@ -167,7 +168,7 @@ func writeTediFile(dir string, o writeTediFileOptions) error {
 	}
 
 	bytes, write := generateFile(res, o.Funcname, o.Prefix, o.BuildTag)
-	if !write {
+	if !write && !o.ForceWrite {
 		return nil
 	}
 
@@ -218,6 +219,7 @@ func testCommand() {
 			Prefix:     "",
 			OutputFile: "tedi_test.go",
 			BuildTag:   "",
+			ForceWrite: true,
 		}); err != nil {
 			die(err)
 		}
