@@ -37,6 +37,11 @@ func (t *Tedi) Fixture(fn interface{}) error {
 
 // OnceFixture registers a function as a fixture that should only be called once.
 func (t *Tedi) OnceFixture(fn interface{}) error {
+	return t.Fixture(Once(fn))
+}
+
+// Once generically makes a new function that only calls fn once and afterwards returns the same result.
+func Once(fn interface{}) interface{} {
 	fnValue := reflect.ValueOf(fn)
 	if fnValue.Kind() != reflect.Func {
 		return ErrFixtureMustBeFunction
@@ -51,10 +56,8 @@ func (t *Tedi) OnceFixture(fn interface{}) error {
 		return res
 	})
 
-	return t.Fixture(onceFnValue.Interface())
+	return onceFnValue.Interface()
 }
-
-type onEndFunc func() error
 
 func (t *Tedi) createContainer(test *testing.T, testName string, testLabels ...string) (*dig.Container, *T, error) {
 	res := dig.New()

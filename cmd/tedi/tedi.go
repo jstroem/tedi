@@ -184,16 +184,17 @@ func writeTediFile(dir string, o writeTediFileOptions) error {
 	return ioutil.WriteFile(outputFile, bytes, 0644)
 }
 
-func pathToPackageDirs(paths []string) ([]string, error) {
-	for _, p := range paths {
-		if !build.IsLocalImport(p) {
-			return nil, fmt.Errorf("given paths needs to be local: '%v'", p)
+func pathToPackageDirs(args []string) ([]string, error) {
+	var paths []string
+	for _, a := range args {
+		if build.IsLocalImport(a) {
+			paths = append(paths, a)
 		}
 	}
 
 	pkgs, err := packages.Load(&packages.Config{
 		Mode: packages.NeedName & packages.NeedFiles,
-	}, testCmd.Args()...)
+	}, paths...)
 	if err != nil {
 		return nil, err
 	}
