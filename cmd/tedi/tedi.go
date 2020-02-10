@@ -84,7 +84,7 @@ var (
 	testRace                 = testCmd.Bool("race", false, "enable the race detector when running tests")
 	testV                    = testCmd.Bool("v", false, "verbose: print additional output")
 
-	tediTestLabels = testCmd.String("labels", "test", "Tedi test labels to run. Can be multiple with ',' as a seperator")
+	tediTestLabels = testCmd.String("labels", annotations.DefaultTestLabel, "Tedi test labels to run. Can be multiple with ',' as a seperator")
 
 	testTags = testCmd.String("tags", "", "tags")
 )

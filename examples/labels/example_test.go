@@ -1,4 +1,4 @@
-package test
+package labels
 
 import (
 	"fmt"
@@ -8,10 +8,6 @@ import (
 
 	"github.com/jstroem/tedi"
 )
-
-//go:generate tedi generate
-
-// @testLabel(integration, integration_)
 
 type a struct {
 	b string
@@ -30,12 +26,8 @@ func randFixture() int64 {
 	return rand.Int63()
 }
 
-func MyTest(t *testing.T, foo int) {
-	fmt.Println(t.Name(), foo)
-}
-
 // @test
-func MyTest2(t *testing.T, foo int, _ printTimerFunc) {
+func MyTest(t *testing.T, foo int, _ printTimerFunc) {
 	fmt.Println(t.Name(), foo)
 }
 
@@ -45,7 +37,7 @@ func myBefore(t *tedi.T) {
 }
 
 // @test
-func MyTest3(t *tedi.T, foo int) {
+func AnotherTest(t *tedi.T, foo int) {
 	fmt.Println(t.Name(), foo)
 	t.Run("first", func(t *tedi.T, foo int) {
 		fmt.Println(t.Name(), foo)
@@ -58,10 +50,6 @@ func MyTest3(t *tedi.T, foo int) {
 // @test(integration)
 func MyIntegrationTest(t *tedi.T, foo int) {
 	fmt.Println("MyIntegrationTest test executed")
-}
-
-func integration_Test(t *tedi.T) {
-	fmt.Println("integration_Test test executed")
 }
 
 type printTimerFunc func()

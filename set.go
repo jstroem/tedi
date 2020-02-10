@@ -30,6 +30,18 @@ func (s *stringSet) Has(str string) bool {
 	return ok
 }
 
+func (s *stringSet) List() []string {
+	if s == nil {
+		return nil
+	}
+
+	res := []string{}
+	for k := range *s {
+		res = append(res, k)
+	}
+	return res
+}
+
 func (s *stringSet) Intersect(b stringSet) stringSet {
 	var res stringSet
 	if s == nil || len(*s) == 0 || len(b) == 0 {

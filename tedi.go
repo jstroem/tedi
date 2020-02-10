@@ -2,8 +2,11 @@ package tedi
 
 import (
 	"flag"
+	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/jstroem/tedi/annotations"
 )
 
 var (
@@ -11,7 +14,7 @@ var (
 )
 
 func init() {
-	flag.StringVar(&_tediTestLabels, "labels", "test", "Tedi test labels to run. Can be multiple with ',' as a seperator")
+	flag.StringVar(&_tediTestLabels, "labels", annotations.DefaultTestLabel, "Tedi test labels to run. Can be multiple with ',' as a seperator")
 }
 
 // Tedi encapsulates tests for an entire package.
@@ -41,6 +44,9 @@ func New(m *testing.M) *Tedi {
 
 // Run executes the Tedi test.
 func (t *Tedi) Run() int {
+	if len(t.runLabels.Intersect(t.labels)) == 0 {
+		fmt.Println("tedi: warning: labels did not match any tests. Available labels:", strings.Join(t.labels.List(), ", "))
+	}
 	return t.m.Run()
 }
 

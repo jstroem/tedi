@@ -17,8 +17,6 @@ const (
 	// OnceFixtureAnnotation used to label a function as a fixture to be called once
 	OnceFixtureAnnotation = "@onceFixture"
 
-	DoAnnotation = "@doOnce"
-
 	// TestAnnotation used to label a function as a test
 	TestAnnotation = "@test"
 
@@ -31,20 +29,29 @@ const (
 	// TestLabelAnnotation used to introduce a new test Label.
 	TestLabelAnnotation = "@testLabel"
 
-	// DefaultTestLabelAnnotation used to set the default test label.
-	DefaultTestLabelAnnotation = "@defaultTestLabel"
+	unitTestLabel        = "unit"
+	regressionTestLabel  = "regression"
+	integrationTestLabel = "integration"
 
-	defaultTestLabel = "test"
+	DefaultTestLabel = unitTestLabel
 )
 
 var (
-	fixtureRegexp          = annotationRegexp(FixtureAnnotation)
-	onceFixtureRegexp      = annotationRegexp(OnceFixtureAnnotation)
-	testRegexp             = annotationWithOptionalParamsRegexp(TestAnnotation)
-	beforeTestRegexp       = annotationWithOptionalParamsRegexp(BeforeTestAnnotation)
-	afterTestRegexp        = annotationWithOptionalParamsRegexp(AfterTestAnnotation)
-	testLabelRegexp        = annotationWithParamsRegexp(TestLabelAnnotation)
-	defaultTestLabelRegexp = annotationWithParamsRegexp(DefaultTestLabelAnnotation)
+	unitTestMatcher        = []string{"test_", "unit_"}
+	regressionTestMatcher  = []string{"reg_", "regression_"}
+	integrationTestMatcher = []string{"int_", "integration_"}
+	fixtureMatcher         = []string{"fix_", "fixture_", "provide_"}
+	beforeTestMatcher      = []string{"pre_", "beforeTest_"}
+	afterTestMatcher       = []string{"post_", "afterTest_"}
+)
+
+var (
+	fixtureRegexp     = annotationRegexp(FixtureAnnotation)
+	onceFixtureRegexp = annotationRegexp(OnceFixtureAnnotation)
+	testRegexp        = annotationWithOptionalParamsRegexp(TestAnnotation)
+	beforeTestRegexp  = annotationWithOptionalParamsRegexp(BeforeTestAnnotation)
+	afterTestRegexp   = annotationWithOptionalParamsRegexp(AfterTestAnnotation)
+	testLabelRegexp   = annotationWithParamsRegexp(TestLabelAnnotation)
 )
 
 func annotationRegexp(annotation string) *regexp.Regexp {
@@ -103,9 +110,17 @@ func Parse(pkgDir string, filePrefix string, autoLabel bool) (*ParseResult, erro
 		return nil, err
 	}
 
+	return parse(parseResult, autoLabel)
+}
+
+func parse(parseResult *parseResult, autoLabel bool) (*ParseResult, error) {
 	res := &ParseResult{
-		DefaultTestLabel: defaultTestLabel,
-		TestLabels:       map[string][]string{},
+		DefaultTestLabel: DefaultTestLabel,
+		TestLabels: map[string][]string{
+			unitTestLabel:        unitTestMatcher,
+			integrationTestLabel: integrationTestMatcher,
+			regressionTestLabel:  regressionTestMatcher,
+		},
 	}
 
 	for _, cmt := range parseResult.comments {
@@ -123,21 +138,6 @@ func Parse(pkgDir string, filePrefix string, autoLabel bool) (*ParseResult, erro
 
 			Label := params[0]
 			res.TestLabels[Label] = append(res.TestLabels[Label], params[1:]...)
-		}
-
-		if defaultTestLabelRegexp.MatchString(cmt) {
-			params, ok := getParams(defaultTestLabelRegexp, cmt)
-			if !ok {
-				res.Warnings = append(res.Warnings, fmt.Sprintf("@defaultTestLabel parameters could not be parsed '%s'", cmt))
-				continue
-			}
-
-			if len(params) > 1 {
-				res.Warnings = append(res.Warnings, fmt.Sprintf("@defaultTestLabel can only have one argument '%s'", cmt))
-				continue
-			}
-
-			res.DefaultTestLabel = params[0]
 		}
 	}
 
@@ -164,6 +164,7 @@ func Parse(pkgDir string, filePrefix string, autoLabel bool) (*ParseResult, erro
 		return labels, ok
 	}
 
+funcLoop:
 	for _, fn := range parseResult.functions {
 		if res.Package == nil {
 			res.Package = fn.Package
@@ -203,17 +204,40 @@ func Parse(pkgDir string, filePrefix string, autoLabel bool) (*ParseResult, erro
 			continue
 		}
 
-		// Check auto grouping
-		var labels []string
-		for label, prefixes := range res.TestLabels {
-			for _, prefix := range prefixes {
+		if autoLabel {
+			for _, prefix := range fixtureMatcher {
 				if strings.HasPrefix(fn.Name(), prefix) {
-					labels = append(labels, label)
+					res.Fixtures = append(res.Fixtures, fn)
+					continue funcLoop
 				}
 			}
-		}
-		if len(labels) > 0 {
-			res.Tests = append(res.Tests, &LabelFunction{Function: fn, Labels: labels})
+
+			for _, prefix := range beforeTestMatcher {
+				if strings.HasPrefix(fn.Name(), prefix) {
+					res.BeforeTests = append(res.BeforeTests, &LabelFunction{Function: fn, Labels: []string{res.DefaultTestLabel}})
+					continue funcLoop
+				}
+			}
+
+			for _, prefix := range afterTestMatcher {
+				if strings.HasPrefix(fn.Name(), prefix) {
+					res.AfterTests = append(res.AfterTests, &LabelFunction{Function: fn, Labels: []string{res.DefaultTestLabel}})
+					continue funcLoop
+				}
+			}
+
+			// Check auto grouping
+			var labels []string
+			for label, prefixes := range res.TestLabels {
+				for _, prefix := range prefixes {
+					if strings.HasPrefix(fn.Name(), prefix) {
+						labels = append(labels, label)
+					}
+				}
+			}
+			if len(labels) > 0 {
+				res.Tests = append(res.Tests, &LabelFunction{Function: fn, Labels: labels})
+			}
 		}
 	}
 
