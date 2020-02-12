@@ -13,27 +13,27 @@ type a struct {
 	b string
 }
 
-func fixture_nameLength(t *testing.T, r int64) int {
+func fixtureNameLength(t *testing.T, r int64) int {
 	fmt.Println("Fixture rand", r)
 	return len(t.Name())
 }
 
-func fixture_rand() int64 {
+func fixtureRand() int64 {
 	fmt.Println("rand fixture called")
 	rand.Seed(time.Now().UnixNano())
 	return rand.Int63()
 }
 
 // @test
-func test_timer(t *testing.T, foo int, _ printTimerFunc) {
+func testTimer(t *testing.T, foo int, _ printTimerFunc) {
 	fmt.Println(t.Name(), foo)
 }
 
-func pre_print(t *tedi.T) {
+func prePrint(t *tedi.T) {
 	fmt.Println("CALLED BEFORE", t.Name())
 }
 
-func test_withSub(t *tedi.T, foo int) {
+func testWithSub(t *tedi.T, foo int) {
 	fmt.Println(t.Name(), foo)
 	t.Run("first", func(t *tedi.T, foo int) {
 		fmt.Println(t.Name(), foo)
@@ -43,17 +43,17 @@ func test_withSub(t *tedi.T, foo int) {
 	})
 }
 
-func integration_withFoo(t *tedi.T, foo int) {
+func integrationWithInt(t *tedi.T, foo int) {
 	fmt.Println("MyIntegrationTest test executed")
 }
 
-func integration_simple(t *tedi.T) {
+func integrationPrint(t *tedi.T) {
 	fmt.Println("integration_Test test executed")
 }
 
 type printTimerFunc func()
 
-func fixture_timer(t *tedi.T) printTimerFunc {
+func fixtureTimer(t *tedi.T) printTimerFunc {
 	start := time.Now()
 	res := func() {
 		fmt.Printf("Execution of: %s took: %v\n", t.Name(), time.Now().Sub(start))
@@ -62,6 +62,6 @@ func fixture_timer(t *tedi.T) printTimerFunc {
 	return res
 }
 
-func test_withSleep(t *tedi.T, _ printTimerFunc) {
+func testWithSleep(t *tedi.T, _ printTimerFunc) {
 	time.Sleep(time.Second)
 }

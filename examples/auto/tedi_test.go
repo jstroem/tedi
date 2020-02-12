@@ -12,24 +12,24 @@ func TestMain(m *testing.M) {
 	t := tedi.New(m)
 
 	// TestLabels:
-	t.TestLabel("unit")
 	t.TestLabel("integration")
 	t.TestLabel("regression")
+	t.TestLabel("unit")
 
 	// Fixtures:
-	t.Fixture(fixture_nameLength)
-	t.Fixture(fixture_rand)
-	t.Fixture(fixture_timer)
+	t.Fixture(fixtureNameLength)
+	t.Fixture(fixtureRand)
+	t.Fixture(fixtureTimer)
 
 	// Before tests:
-	t.BeforeTest(pre_print, "unit")
+	t.BeforeTest(prePrint, "unit")
 
 	// Tests:
-	t.Test("test_timer", test_timer, "unit")
-	t.Test("test_withSub", test_withSub, "unit")
-	t.Test("integration_withFoo", integration_withFoo, "integration")
-	t.Test("integration_simple", integration_simple, "integration")
-	t.Test("test_withSleep", test_withSleep, "unit")
+	t.Test("testTimer", testTimer, "unit")
+	t.Test("testWithSub", testWithSub, "unit")
+	t.Test("integrationWithInt", integrationWithInt, "integration", "integration")
+	t.Test("integrationPrint", integrationPrint, "integration", "integration")
+	t.Test("testWithSleep", testWithSleep, "unit")
 
 	os.Exit(t.Run())
 }

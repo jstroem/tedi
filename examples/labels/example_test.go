@@ -9,6 +9,8 @@ import (
 	"github.com/jstroem/tedi"
 )
 
+// @disableAutoLabelling
+
 type a struct {
 	b string
 }

@@ -8,6 +8,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"unicode"
 )
 
 const (
@@ -29,6 +30,9 @@ const (
 	// TestLabelAnnotation used to introduce a new test Label.
 	TestLabelAnnotation = "@testLabel"
 
+	// DisableAutoLabellingAnnotation can be used to toggle the auto matching of tests.
+	DisableAutoLabellingAnnotation = "@disableAutoLabelling"
+
 	unitTestLabel        = "unit"
 	regressionTestLabel  = "regression"
 	integrationTestLabel = "integration"
@@ -37,21 +41,22 @@ const (
 )
 
 var (
-	unitTestMatcher        = []string{"test_", "unit_"}
-	regressionTestMatcher  = []string{"reg_", "regression_"}
-	integrationTestMatcher = []string{"int_", "integration_"}
-	fixtureMatcher         = []string{"fix_", "fixture_", "provide_"}
-	beforeTestMatcher      = []string{"pre_", "beforeTest_"}
-	afterTestMatcher       = []string{"post_", "afterTest_"}
+	unitTestMatcher        = []string{"test", "unit"}
+	regressionTestMatcher  = []string{"reg", "regression"}
+	integrationTestMatcher = []string{"int", "integration"}
+	fixtureMatcher         = []string{"fix", "fixture"}
+	beforeTestMatcher      = []string{"pre", "beforeTest"}
+	afterTestMatcher       = []string{"post", "afterTest"}
 )
 
 var (
-	fixtureRegexp     = annotationRegexp(FixtureAnnotation)
-	onceFixtureRegexp = annotationRegexp(OnceFixtureAnnotation)
-	testRegexp        = annotationWithOptionalParamsRegexp(TestAnnotation)
-	beforeTestRegexp  = annotationWithOptionalParamsRegexp(BeforeTestAnnotation)
-	afterTestRegexp   = annotationWithOptionalParamsRegexp(AfterTestAnnotation)
-	testLabelRegexp   = annotationWithParamsRegexp(TestLabelAnnotation)
+	fixtureRegexp              = annotationRegexp(FixtureAnnotation)
+	onceFixtureRegexp          = annotationRegexp(OnceFixtureAnnotation)
+	testRegexp                 = annotationWithOptionalParamsRegexp(TestAnnotation)
+	beforeTestRegexp           = annotationWithOptionalParamsRegexp(BeforeTestAnnotation)
+	afterTestRegexp            = annotationWithOptionalParamsRegexp(AfterTestAnnotation)
+	testLabelRegexp            = annotationWithParamsRegexp(TestLabelAnnotation)
+	disableAutoLabellingRegexp = annotationRegexp(DisableAutoLabellingAnnotation)
 )
 
 func annotationRegexp(annotation string) *regexp.Regexp {
@@ -139,6 +144,10 @@ func parse(parseResult *parseResult, autoLabel bool) (*ParseResult, error) {
 			Label := params[0]
 			res.TestLabels[Label] = append(res.TestLabels[Label], params[1:]...)
 		}
+
+		if disableAutoLabellingRegexp.MatchString(cmt) {
+			autoLabel = false
+		}
 	}
 
 	// Ensure that the default test label exists.
@@ -179,13 +188,13 @@ funcLoop:
 			} else {
 				res.Warnings = append(res.Warnings, fmt.Sprintf("@test parameters could not be parsed '%s'", fn.Comment()))
 			}
-			continue
+			continue funcLoop
 		case fn.HasFixtureAnnotation():
 			res.Fixtures = append(res.Fixtures, fn)
-			continue
+			continue funcLoop
 		case fn.HasOnceFixtureAnnotation():
 			res.OnceFixtures = append(res.OnceFixtures, fn)
-			continue
+			continue funcLoop
 		case fn.HasBeforeTestAnnotation():
 			labels, ok := parseLabels(beforeTestRegexp, fn, []string{res.DefaultTestLabel})
 			if ok {
@@ -193,7 +202,7 @@ funcLoop:
 			} else {
 				res.Warnings = append(res.Warnings, fmt.Sprintf("@beforeTest parameters could not be parsed '%s'", fn.Comment()))
 			}
-			continue
+			continue funcLoop
 		case fn.HasAfterTestAnnotation():
 			labels, ok := parseLabels(afterTestRegexp, fn, []string{res.DefaultTestLabel})
 			if ok {
@@ -201,32 +210,32 @@ funcLoop:
 			} else {
 				res.Warnings = append(res.Warnings, fmt.Sprintf("@afterTest parameters could not be parsed '%s'", fn.Comment()))
 			}
-			continue
+			continue funcLoop
 		}
 
 		if autoLabel {
+			// Check auto grouping
 			for _, prefix := range fixtureMatcher {
-				if strings.HasPrefix(fn.Name(), prefix) {
+				if prefixMatch(fn.Name(), prefix) {
 					res.Fixtures = append(res.Fixtures, fn)
 					continue funcLoop
 				}
 			}
 
 			for _, prefix := range beforeTestMatcher {
-				if strings.HasPrefix(fn.Name(), prefix) {
+				if prefixMatch(fn.Name(), prefix) {
 					res.BeforeTests = append(res.BeforeTests, &LabelFunction{Function: fn, Labels: []string{res.DefaultTestLabel}})
 					continue funcLoop
 				}
 			}
 
 			for _, prefix := range afterTestMatcher {
-				if strings.HasPrefix(fn.Name(), prefix) {
+				if prefixMatch(fn.Name(), prefix) {
 					res.AfterTests = append(res.AfterTests, &LabelFunction{Function: fn, Labels: []string{res.DefaultTestLabel}})
 					continue funcLoop
 				}
 			}
 
-			// Check auto grouping
 			var labels []string
 			for label, prefixes := range res.TestLabels {
 				for _, prefix := range prefixes {
@@ -242,6 +251,17 @@ funcLoop:
 	}
 
 	return res, nil
+}
+
+func prefixMatch(str, prefix string) bool {
+	if !strings.HasPrefix(str, prefix) {
+		return false
+	}
+	if len(str) == len(prefix) {
+		return true
+	}
+	c := rune(str[len(prefix)])
+	return c == '_' || unicode.IsUpper(c)
 }
 
 // Function represents a function declaration.
