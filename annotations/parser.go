@@ -53,8 +53,8 @@ var (
 	fixtureRegexp              = annotationRegexp(FixtureAnnotation)
 	onceFixtureRegexp          = annotationRegexp(OnceFixtureAnnotation)
 	testRegexp                 = annotationWithOptionalParamsRegexp(TestAnnotation)
-	beforeTestRegexp           = annotationWithOptionalParamsRegexp(BeforeTestAnnotation)
-	afterTestRegexp            = annotationWithOptionalParamsRegexp(AfterTestAnnotation)
+	beforeTestRegexp           = annotationRegexp(BeforeTestAnnotation)
+	afterTestRegexp            = annotationRegexp(AfterTestAnnotation)
 	testLabelRegexp            = annotationWithParamsRegexp(TestLabelAnnotation)
 	disableAutoLabellingRegexp = annotationRegexp(DisableAutoLabellingAnnotation)
 )
@@ -97,8 +97,8 @@ type ParseResult struct {
 	Fixtures     []*Function
 	OnceFixtures []*Function
 	Tests        []*LabelFunction
-	BeforeTests  []*LabelFunction
-	AfterTests   []*LabelFunction
+	BeforeTests  []*Function
+	AfterTests   []*Function
 
 	Warnings []string
 }
@@ -196,20 +196,10 @@ funcLoop:
 			res.OnceFixtures = append(res.OnceFixtures, fn)
 			continue funcLoop
 		case fn.HasBeforeTestAnnotation():
-			labels, ok := parseLabels(beforeTestRegexp, fn, []string{res.DefaultTestLabel})
-			if ok {
-				res.BeforeTests = append(res.BeforeTests, &LabelFunction{Function: fn, Labels: labels})
-			} else {
-				res.Warnings = append(res.Warnings, fmt.Sprintf("@beforeTest parameters could not be parsed '%s'", fn.Comment()))
-			}
+			res.BeforeTests = append(res.BeforeTests, fn)
 			continue funcLoop
 		case fn.HasAfterTestAnnotation():
-			labels, ok := parseLabels(afterTestRegexp, fn, []string{res.DefaultTestLabel})
-			if ok {
-				res.AfterTests = append(res.AfterTests, &LabelFunction{Function: fn, Labels: labels})
-			} else {
-				res.Warnings = append(res.Warnings, fmt.Sprintf("@afterTest parameters could not be parsed '%s'", fn.Comment()))
-			}
+			res.AfterTests = append(res.AfterTests, fn)
 			continue funcLoop
 		}
 
@@ -224,23 +214,25 @@ funcLoop:
 
 			for _, prefix := range beforeTestMatcher {
 				if prefixMatch(fn.Name(), prefix) {
-					res.BeforeTests = append(res.BeforeTests, &LabelFunction{Function: fn, Labels: []string{res.DefaultTestLabel}})
+					res.BeforeTests = append(res.BeforeTests, fn)
 					continue funcLoop
 				}
 			}
 
 			for _, prefix := range afterTestMatcher {
 				if prefixMatch(fn.Name(), prefix) {
-					res.AfterTests = append(res.AfterTests, &LabelFunction{Function: fn, Labels: []string{res.DefaultTestLabel}})
+					res.AfterTests = append(res.AfterTests, fn)
 					continue funcLoop
 				}
 			}
 
 			var labels []string
+		labelLoop:
 			for label, prefixes := range res.TestLabels {
 				for _, prefix := range prefixes {
 					if strings.HasPrefix(fn.Name(), prefix) {
 						labels = append(labels, label)
+						continue labelLoop
 					}
 				}
 			}

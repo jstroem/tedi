@@ -24,7 +24,7 @@ func TestMain(m *testing.M) {
 	t.OnceFixture(randFixture)
 
 	// Before tests:
-	t.BeforeTest(myBefore, "unit")
+	t.BeforeTest(myBefore)
 
 	// Tests:
 	t.Test("MyTest", MyTest, "unit")

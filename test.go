@@ -17,23 +17,19 @@ func (t *Tedi) Test(name string, fn interface{}, labels ...string) {
 	matchedLabels = matchedLabels.Intersect(t.runLabels)
 	if len(matchedLabels) > 0 {
 		// Ignore test if the groupset does not overlap with the running set.
-		testFn := t.wrapTest(name, fn, labels...)
+		testFn := t.wrapTest(name, fn, matchedLabels.List()...)
 		t.addTest(name, testFn)
 	}
 }
 
 // BeforeTest registers a function as a beforeTest hook.
-func (t *Tedi) BeforeTest(fn interface{}, labels ...string) {
-	for _, label := range labels {
-		t.beforeTests[label] = append(t.beforeTests[label], fn)
-	}
+func (t *Tedi) BeforeTest(fn interface{}) {
+	t.beforeTests = append(t.beforeTests, fn)
 }
 
 // AfterTest registers a function as a afterTest hook.
-func (t *Tedi) AfterTest(fn interface{}, labels ...string) {
-	for _, label := range labels {
-		t.afterTests[label] = append(t.afterTests[label], fn)
-	}
+func (t *Tedi) AfterTest(fn interface{}) {
+	t.afterTests = append(t.afterTests, fn)
 }
 
 type testFunc func(t *testing.T)
@@ -69,16 +65,14 @@ func (t *Tedi) addTest(name string, fn testFunc) {
 
 func (t *Tedi) createT(test *testing.T, container *dig.Container, testName string, testLabels ...string) *T {
 	res := &T{
-		T:          test,
-		tedi:       t,
-		container:  container,
-		running:    false,
-		testName:   testName,
-		testLabels: testLabels,
-	}
-	for _, label := range testLabels {
-		res.beforeTests = append(res.beforeTests, t.beforeTests[label]...)
-		res.afterTests = append(res.afterTests, t.afterTests[label]...)
+		T:           test,
+		tedi:        t,
+		container:   container,
+		running:     false,
+		testName:    testName,
+		testLabels:  testLabels,
+		beforeTests: t.beforeTests[:],
+		afterTests:  t.afterTests[:],
 	}
 	return res
 }
@@ -133,4 +127,8 @@ func (t *T) AfterTest(fn interface{}) {
 // Run fn as a subtest of t similar to how testing.T.Run would work.
 func (t *T) Run(name string, fn interface{}) bool {
 	return t.T.Run(name, t.tedi.wrapTest(name, fn, t.testLabels...))
+}
+
+func (t *T) Labels() []string {
+	return t.testLabels
 }

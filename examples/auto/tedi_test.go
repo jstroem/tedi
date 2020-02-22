@@ -22,13 +22,13 @@ func TestMain(m *testing.M) {
 	t.Fixture(fixtureTimer)
 
 	// Before tests:
-	t.BeforeTest(prePrint, "unit")
+	t.BeforeTest(prePrint)
 
 	// Tests:
 	t.Test("testTimer", testTimer, "unit")
 	t.Test("testWithSub", testWithSub, "unit")
-	t.Test("integrationWithInt", integrationWithInt, "integration", "integration")
-	t.Test("integrationPrint", integrationPrint, "integration", "integration")
+	t.Test("integrationWithInt", integrationWithInt, "integration")
+	t.Test("integrationPrint", integrationPrint, "integration")
 	t.Test("testWithSleep", testWithSleep, "unit")
 
 	os.Exit(t.Run())

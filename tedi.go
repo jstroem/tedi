@@ -24,8 +24,8 @@ type Tedi struct {
 	runLabels   stringSet
 	labels      stringSet
 	fixtures    []interface{}
-	beforeTests map[string][]interface{}
-	afterTests  map[string][]interface{}
+	beforeTests []interface{}
+	afterTests  []interface{}
 }
 
 // New creates a new tedi test.
@@ -37,8 +37,8 @@ func New(m *testing.M) *Tedi {
 	return &Tedi{
 		m:           m,
 		runLabels:   newStringSet(strings.Split(_tediTestLabels, ",")...),
-		beforeTests: map[string][]interface{}{},
-		afterTests:  map[string][]interface{}{},
+		beforeTests: []interface{}{},
+		afterTests:  []interface{}{},
 	}
 }
 

@@ -35,7 +35,7 @@ func MyTest(t *testing.T, foo int, _ printTimerFunc) {
 
 // @beforeTest
 func myBefore(t *tedi.T) {
-	fmt.Println("CALLED BEFORE", t.Name())
+	fmt.Println("CALLED BEFORE", t.Name(), t.Labels())
 }
 
 // @test

@@ -32,8 +32,8 @@ const (
 	fixtureCall     = `t.Fixture(%s)` + "\n"
 	onceFixtureCall = `t.OnceFixture(%s)` + "\n"
 	testCall        = `t.Test("%s", %s%s)` + "\n"
-	beforeTestCall  = `t.BeforeTest(%s%s)` + "\n"
-	afterTestCall   = `t.AfterTest(%s%s)` + "\n"
+	beforeTestCall  = `t.BeforeTest(%s)` + "\n"
+	afterTestCall   = `t.AfterTest(%s)` + "\n"
 	testLabelCall   = `t.TestLabel("%s")` + "\n"
 )
 
@@ -302,11 +302,7 @@ func generateFile(parsed *annotations.ParseResult, funcName, prefixTestName, bui
 		fmt.Fprintln(&buf, "")
 		fmt.Fprintln(&buf, "// Before tests: ")
 		for _, test := range parsed.BeforeTests {
-			labelArgs := ""
-			if len(test.Labels) > 0 {
-				labelArgs = fmt.Sprint(`, "`, strings.Join(test.Labels, `", "`), `"`)
-			}
-			fmt.Fprintf(&buf, beforeTestCall, test.Decl.Name.Name, labelArgs)
+			fmt.Fprintf(&buf, beforeTestCall, test.Decl.Name.Name)
 		}
 	}
 
@@ -328,11 +324,7 @@ func generateFile(parsed *annotations.ParseResult, funcName, prefixTestName, bui
 		fmt.Fprintln(&buf, "")
 		fmt.Fprintln(&buf, "// After tests: ")
 		for _, test := range parsed.AfterTests {
-			labelArgs := ""
-			if len(test.Labels) > 0 {
-				labelArgs = fmt.Sprint(`, "`, strings.Join(test.Labels, `", "`), `"`)
-			}
-			fmt.Fprintf(&buf, afterTestCall, test.Decl.Name.Name, labelArgs)
+			fmt.Fprintf(&buf, afterTestCall, test.Decl.Name.Name)
 		}
 	}
 

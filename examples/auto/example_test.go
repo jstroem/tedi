@@ -24,13 +24,12 @@ func fixtureRand() int64 {
 	return rand.Int63()
 }
 
-// @test
 func testTimer(t *testing.T, foo int, _ printTimerFunc) {
 	fmt.Println(t.Name(), foo)
 }
 
 func prePrint(t *tedi.T) {
-	fmt.Println("CALLED BEFORE", t.Name())
+	fmt.Println("CALLED BEFORE", t.Name(), t.Labels())
 }
 
 func testWithSub(t *tedi.T, foo int) {
