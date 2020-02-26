@@ -132,3 +132,12 @@ func (t *T) Run(name string, fn interface{}) bool {
 func (t *T) Labels() []string {
 	return t.testLabels
 }
+
+func (t *T) HasLabel(label string) bool {
+	for _, l := range t.testLabels {
+		if l == label {
+			return true
+		}
+	}
+	return false
+}
